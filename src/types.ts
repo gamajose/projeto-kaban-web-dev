@@ -1,7 +1,14 @@
-// ClickUp Clone Types
-
+import type { Pool } from 'pg';
 export interface CloudflareBindings {
   DB: D1Database;
+  PG: Pool;
+  
+  // Adicione estas linhas para as variáveis de ambiente
+  DB_HOST: string;
+  DB_PORT: string;
+  DB_USER: string;
+  DB_PASSWORD: string;
+  DB_DATABASE: string;
 }
 
 export interface User {

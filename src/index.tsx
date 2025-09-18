@@ -2,8 +2,22 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { serveStatic } from 'hono/cloudflare-workers'
 import type { CloudflareBindings } from './types'
+import { Pool } from 'pg'; 
 
 const app = new Hono<{ Bindings: CloudflareBindings }>()
+
+//middleware
+app.use('*', async (c, next) => {
+  const pool = new Pool({
+    host: c.env.DB_HOST,
+    port: parseInt(c.env.DB_PORT, 10),
+    user: c.env.DB_USER,
+    password: c.env.DB_PASSWORD,
+    database: c.env.DB_DATABASE,
+  });
+  c.set('PG', pool);
+  await next();
+});
 
 // Enable CORS for API routes
 app.use('/api/*', cors())
