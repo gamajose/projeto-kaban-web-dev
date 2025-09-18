@@ -2,6 +2,7 @@ import type { Pool } from 'pg';
 export interface CloudflareBindings {
   DB: D1Database;
   PG: Pool;
+  AVATAR_BUCKET: R2Bucket;
   
   // Adicione estas linhas para as variáveis de ambiente
   DB_HOST: string;
@@ -9,6 +10,8 @@ export interface CloudflareBindings {
   DB_USER: string;
   DB_PASSWORD: string;
   DB_DATABASE: string;
+
+  GEMINI_API_KEY: string;
 }
 
 export interface User {

@@ -134,3 +134,7 @@ INSERT INTO notifications (user_id, title, message, type, entity_type, entity_id
   (4, 'Due date approaching', '"Implement user endpoints" is due in 2 days', 'warning', 'task', 10),
   (1, 'Task completed', '"Design API schema" has been completed', 'success', 'task', 9)
 ON CONFLICT DO NOTHING;
+
+INSERT INTO automations (list_id, name, trigger_type, trigger_config, action_type, action_config) VALUES
+(3, 'Atribuir tarefas de teste para a Diana', 'status_changed', '{"to_status_id": 12}', 'assign_user', '{"assignee_id": 5}')
+ON CONFLICT DO NOTHING;
