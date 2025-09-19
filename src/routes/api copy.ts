@@ -3,15 +3,10 @@ import type { CloudflareBindings } from '../types';
 import { generateTaskSuggestions } from '../services/ai';
 import { processAutomations } from '../services/automation';
 import { requirePermission } from '../middleware/auth';
-import { authRoutes } from './routes/auth';
 
 type Env = {
   Bindings: CloudflareBindings;
 };
-
-
-app.route('/auth', authRoutes)
-app.route('/', publicRoutes);
 
 // --- API Router ---
 // Criamos uma nova instância do Hono que servirá como o nosso router de API
