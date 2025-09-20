@@ -1,373 +1,272 @@
 import { Hono } from 'hono';
-import type { CloudflareBindings } from '../types';
-import { generateTaskSuggestions } from '../services/ai';
-import { processAutomations } from '../services/automation';
-import { requirePermission } from '../middleware/auth';
+import { cors } from 'hono/cors';
+import { serveStatic } from 'hono/cloudflare-workers';
+import type { CloudflareBindings } from './types';
+import { Pool } from 'pg';
+import { apiRoutes, publicRoutes } from './routes/api';
 import { authRoutes } from './routes/auth';
 
 type Env = {
   Bindings: CloudflareBindings;
 };
 
+const app = new Hono<Env>();
 
-app.route('/auth', authRoutes)
+// Middleware de conexão com o banco de dados
+app.use('*', async (c, next) => {
+  const requiredEnvVars: (keyof CloudflareBindings)[] = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_DATABASE', 'JWT_SECRET'];
+  for (const varName of requiredEnvVars) {
+    if (!c.env[varName]) {
+      return c.json({ error: `Configuração do servidor incompleta: ${varName} em falta.` }, 500);
+    }
+  }
+  const pool = new Pool({
+    host: c.env.DB_HOST,
+    port: parseInt(c.env.DB_PORT, 10),
+    user: c.env.DB_USER,
+    password: c.env.DB_PASSWORD,
+    database: c.env.DB_DATABASE,
+  });
+  c.set('PG', pool);
+  await next();
+});
+
+// Outros Middlewares
+app.use('/static/*', serveStatic({ root: './public' }));
+app.use('/api/*', cors());
+app.use('/auth/*', cors());
+
+// Montagem dos Routers
+app.route('/api', apiRoutes);
+app.route('/auth', authRoutes);
 app.route('/', publicRoutes);
 
-// --- API Router ---
-// Criamos uma nova instância do Hono que servirá como o nosso router de API
-export const apiRoutes = new Hono<Env>();
+// --- ROTAS QUE SERVEM AS PÁGINAS HTML ---
 
-// Health check
-apiRoutes.get('/health', (c) => {
-  return c.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+        <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>ClickUp Clone - Gerenciamento de Projetos</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <link href="/static/style.css" rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    </head>
+    <body class="bg-gray-50">
+        <div id="app"></div>
+        <div id="loading" class="fixed inset-0 bg-white flex items-center justify-center z-50">
+            <div class="text-center"><div class="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div><h2 class="text-xl font-semibold text-gray-700">Carregando...</h2></div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+
+        <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
+        
+        <script src="/static/components/widget-mytasks.js"></script>
+        <script src="/static/components/widget-recent.js"></script>
+        <script src="/static/components/widget-agenda.js"></script>
+        <script src="/static/components/widget-mywork.js"></script>
+        <script src="/static/components/widget-assignedtome.js"></script>
+
+        <script src="/static/authService.js"></script>
+        
+        <script src="/static/app.js"></script>
+    </body>
+    </html>
+  `);
 });
 
-// Users API
-apiRoutes.get('/users', async (c) => {
-  try {
-    const pool = c.get('PG');
-    const result = await pool.query(`
-      SELECT id, email, name, avatar_url, role, status, timezone, created_at, updated_at
-      FROM users 
-      ORDER BY name
+app.get('/dashboard', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+        <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Dashboard - ClickUp Clone</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <link href="/static/style.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-50">
+        <div id="app"></div>
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="/static/dashboard.js"></script>
+
+        <script src="/static/authService.js"></script>
+
+        <script src="/static/components/widget-mywork.js"></script>
+
+        <script src="/static/app.js"></script>
+    </body>
+    </html>
+  `);
+});
+
+app.get('/login', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+        <meta charset="UTF-8"><title>Login - ClickUp Clone</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="/static/style.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-800 flex items-center justify-center h-screen">
+        <div class="w-full max-w-md">
+            <div id="auth-form" class="bg-[var(--bg-secondary)] p-8 rounded-lg shadow-md border border-[var(--border-color)]">
+                <h2 class="text-2xl font-bold text-center text-white mb-6">Iniciar Sessão</h2>
+                <div class="form-group"><label class="form-label text-gray-300" for="email">Email</label><input id="email" type="email" class="form-input bg-gray-700 text-white border-gray-600" required></div>
+                <div class="form-group"><label class="form-label text-gray-300" for="password">Senha</label><input id="password" type="password" class="form-input bg-gray-700 text-white border-gray-600" required></div>
+                <button id="login-button" class="btn btn-primary w-full" style="background-color: var(--accent-color);">Entrar</button>
+                <p class="text-center text-sm text-gray-400 mt-4">Ainda não tem conta? <a href="/register" class="text-[var(--accent-color)] hover:underline">Registe-se</a></p>
+            </div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+        <script src="/static/auth.js"></script>
+    </body>
+    </html>
+  `);
+});
+
+app.get('/register', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+        <meta charset="UTF-8"><title>Registo - ClickUp Clone</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="/static/style.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-800 flex items-center justify-center h-screen">
+        <div class="w-full max-w-md">
+            <div id="auth-form" class="bg-[var(--bg-secondary)] p-8 rounded-lg shadow-md border border-[var(--border-color)]">
+                <h2 class="text-2xl font-bold text-center text-white mb-6">Criar Conta</h2>
+                <div class="form-group"><label class="form-label text-gray-300" for="name">Nome Completo</label><input id="name" type="text" class="form-input bg-gray-700 text-white border-gray-600" required></div>
+                <div class="form-group"><label class="form-label text-gray-300" for="email">Email</label><input id="email" type="email" class="form-input bg-gray-700 text-white border-gray-600" required></div>
+                <div class="form-group"><label class="form-label text-gray-300" for="password">Senha</label><input id="password" type="password" class="form-input bg-gray-700 text-white border-gray-600" required></div>
+                <button id="register-button" class="btn btn-primary w-full" style="background-color: var(--accent-color);">Registar</button>
+                <p class="text-center text-sm text-gray-400 mt-4">Já tem uma conta? <a href="/login" class="text-[var(--accent-color)] hover:underline">Inicie sessão</a></p>
+            </div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+        <script src="/static/auth.js"></script>
+    </body>
+    </html>
+  `);
+});
+
+app.get('/logout', (c) => {
+    // Esta rota apenas serve um HTML que aciona o logout no JS e redireciona
+    return c.html(`
+        <script>
+            localStorage.clear();
+            window.location.href = '/login';
+        </script>
     `);
-    return c.json({ users: result.rows });
-  } catch (error) {
-    console.error(error);
-    return c.json({ error: 'Failed to fetch users' }, 500);
-  }
 });
 
-apiRoutes.get('/users/:id', async (c) => {
-  try {
-    const id = c.req.param('id');
-    const pool = c.get('PG');
-    const result = await pool.query(`
-      SELECT id, email, name, avatar_url, role, status, timezone, created_at, updated_at
-      FROM users 
-      WHERE id = $1
-    `, [id]);
-    
-    if (result.rows.length === 0) {
-      return c.json({ error: 'User not found' }, 404);
-    }
-    
-    return c.json({ user: result.rows[0] });
-  } catch (error) {
-    console.error(error);
-    return c.json({ error: 'Failed to fetch user' }, 500);
-  }
+app.get('/workspace/:workspace_id/*', (c) => {
+  const workspaceId = c.req.param('workspace_id');
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+        <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Workspace - ClickUp Clone</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <link href="/static/style.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-50">
+        <div id="app" data-workspace-id="${workspaceId}"></div>
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="/static/workspace.js"></script>
+
+        <script src="/static/authService.js"></script>
+
+        <script src="/static/components/widget-mywork.js"></script>
+
+        <script src="/static/app.js"></script>
+    </body>
+    </html>
+  `);
 });
 
-apiRoutes.put('/users/:id/profile', async (c) => {
-    const userId = c.req.param('id');
-    const { name, timezone } = await c.req.json();
+app.get('/profile', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+        <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Meu Perfil - ClickUp Clone</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <link href="/static/style.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-50">
+        <div id="app-profile">
+            <div class="max-w-4xl mx-auto py-8">
+                <h1 class="text-3xl font-bold mb-6">Meu Perfil</h1>
+                <div class="bg-white p-6 rounded-lg border">
+                    <div class="flex items-center space-x-6 mb-6">
+                        <img id="profile-avatar-img" src="/static/default-avatar.png" class="w-24 h-24 rounded-full bg-gray-200">
+                        <div>
+                            <label for="avatar-upload" class="btn btn-secondary cursor-pointer"><i class="fas fa-upload mr-2"></i>Alterar Foto</label>
+                            <input type="file" id="avatar-upload" class="hidden" accept="image/png, image/jpeg">
+                        </div>
+                    </div>
+                    <div class="form-group"><label class="form-label">Nome</label><input id="profile-name" type="text" class="form-input" placeholder="Carregando..."></div>
+                    <div class="form-group"><label class="form-label">Email</label><input id="profile-email" type="email" class="form-input" disabled placeholder="Carregando..."></div>
+                    <div class="form-group"><label class="form-label">Fuso Horário</label><select id="profile-timezone" class="form-input"><option value="America/Sao_Paulo">São Paulo (GMT-3)</option><option value="Europe/Lisbon">Lisboa (GMT+1)</option><option value="UTC">UTC</option></select></div>
+                    <button id="save-profile" class="btn btn-primary"><i class="fas fa-save mr-2"></i>Guardar Alterações</button>
+                </div>
+            </div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
 
-    if (parseInt(userId) !== 1) { // Simulação do utilizador atual
-        return c.json({ error: 'Não autorizado' }, 403);
-    }
+        <script src="/static/authService.js"></script>
 
-    const pool = c.get('PG');
-    await pool.query('UPDATE users SET name = $1, timezone = $2 WHERE id = $3', [name, timezone, userId]);
-    return c.json({ success: true });
+        <script src="/static/components/widget-mywork.js"></script>
+
+        <script src="/static/app.js"></script>
+
+        <script src="/static/profile.js"></script>
+    </body>
+    </html>
+  `);
 });
 
-apiRoutes.post('/users/:id/avatar', async (c) => {
-  const userId = c.req.param('id');
-  const currentUserId = 1; // Simulação
+app.get('/reports/workspace/:id', (c) => {
+    const workspaceId = c.req.param('id');
+    return c.html(`
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+            <meta charset="UTF-8"><title>Relatórios - ClickUp Clone</title>
+            <script src="https://cdn.tailwindcss.com"></script>
+            <link href="/static/style.css" rel="stylesheet">
+        </head>
+        <body class="bg-gray-50">
+            <div id="app-reports" data-workspace-id="${workspaceId}">
+                <div class="p-8"><h1 class="text-3xl font-bold mb-8">Relatórios do Workspace</h1><div class="grid grid-cols-1 lg:grid-cols-2 gap-8"><div class="widget"><h3 class="widget-title mb-4">Desempenho da Equipa</h3><div class="chart-container" style="height: 300px;"><canvas id="team-performance-chart"></canvas></div></div><div class="widget"><h3 class="widget-title mb-4">Distribuição por Prioridade</h3><div class="chart-container" style="height: 300px;"><canvas id="priority-chart"></canvas></div></div><div class="widget col-span-1 lg:col-span-2"><h3 class="widget-title mb-4">Tendência de Conclusão</h3><div class="chart-container" style="height: 300px;"><canvas id="completion-trend-chart"></canvas></div></div></div></div>
+            </div>
+            <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <script src="/static/reports.js"></script>
+            <script src="/static/authService.js"></script>
 
-  if (parseInt(userId) !== currentUserId) {
-      return c.json({ error: 'Não autorizado' }, 403);
-  }
-  try {
-      const body = await c.req.parseBody();
-      const avatarFile = body['avatar'] as File;
+            <script src="/static/components/widget-mywork.js"></script>
 
-      if (!avatarFile || !(avatarFile instanceof File)) {
-          return c.json({ error: 'Ficheiro de avatar não enviado ou inválido.' }, 400);
-      }
-      
-      const r2Bucket = c.env.AVATAR_BUCKET;
-      const fileKey = `avatars/user-${userId}`;
-      await r2Bucket.put(fileKey, await avatarFile.arrayBuffer(), {
-          httpMetadata: { contentType: avatarFile.type },
-      });
-
-      const internalAvatarUrl = `/avatars/${userId}?v=${Date.now()}`;
-      const pool = c.get('PG');
-      await pool.query('UPDATE users SET avatar_url = $1 WHERE id = $2', [internalAvatarUrl, userId]);
-      return c.json({ success: true, avatar_url: internalAvatarUrl });
-  } catch (error) {
-      console.error('Erro no upload do avatar:', error);
-      return c.json({ error: 'Falha ao processar o upload do avatar.' }, 500);
-  }
-});
-
-// Workspaces API
-apiRoutes.get('/workspaces', async (c) => {
-  try {
-    const pool = c.get('PG');
-    const result = await pool.query(`
-      SELECT w.*, u.name as owner_name
-      FROM workspaces w
-      LEFT JOIN users u ON w.owner_id = u.id
-      ORDER BY w.name
+            <script src="/static/app.js"></script>
+        </body>
+        </html>
     `);
-    return c.json({ workspaces: result.rows });
-  } catch (error) {
-    console.error(error);
-    return c.json({ error: 'Failed to fetch workspaces' }, 500);
-  }
 });
 
-apiRoutes.get('/workspaces/:id', async (c) => {
-  try {
-    const id = c.req.param('id');
-    const pool = c.get('PG');
-    
-    const workspaceResult = await pool.query(`
-      SELECT w.*, u.name as owner_name
-      FROM workspaces w
-      LEFT JOIN users u ON w.owner_id = u.id
-      WHERE w.id = $1
-    `, [id]);
-    
-    if (workspaceResult.rows.length === 0) {
-      return c.json({ error: 'Workspace not found' }, 404);
-    }
-    const workspace = workspaceResult.rows[0];
-    
-    const membersResult = await pool.query(`
-      SELECT wm.*, u.name as user_name, u.email as user_email, u.avatar_url as user_avatar
-      FROM workspace_members wm
-      LEFT JOIN users u ON wm.user_id = u.id
-      WHERE wm.workspace_id = $1
-      ORDER BY wm.role, u.name
-    `, [id]);
-    
-    const spacesResult = await pool.query(`
-      SELECT * FROM spaces 
-      WHERE workspace_id = $1
-      ORDER BY name
-    `, [id]);
-    
-    return c.json({ 
-      workspace: {
-        ...workspace,
-        members: membersResult.rows,
-        spaces: spacesResult.rows
-      }
-    });
-  } catch (error) {
-    console.error(error);
-    return c.json({ error: 'Failed to fetch workspace' }, 500);
-  }
-});
-
-// Spaces API
-apiRoutes.get('/spaces/:id', async (c) => {
-  try {
-    const id = c.req.param('id');
-    const pool = c.get('PG');
-    
-    const spaceResult = await pool.query('SELECT * FROM spaces WHERE id = $1', [id]);
-    
-    if (spaceResult.rows.length === 0) {
-      return c.json({ error: 'Space not found' }, 404);
-    }
-    const space = spaceResult.rows[0];
-    
-    const foldersResult = await pool.query(`
-      SELECT * FROM folders 
-      WHERE space_id = $1
-      ORDER BY position, name
-    `, [id]);
-    
-    const listsResult = await pool.query(`
-      SELECT * FROM lists 
-      WHERE space_id = $1 OR folder_id IN (
-        SELECT id FROM folders WHERE space_id = $1
-      )
-      ORDER BY position, name
-    `, [id]);
-    
-    return c.json({ 
-      space: {
-        ...space,
-        folders: foldersResult.rows,
-        lists: listsResult.rows
-      }
-    });
-  } catch (error) {
-    console.error(error);
-    return c.json({ error: 'Failed to fetch space' }, 500);
-  }
-});
-
-// Lists API
-apiRoutes.get('/lists/:id', async (c) => {
-  try {
-    const id = c.req.param('id');
-    const pool = c.get('PG');
-
-    const listResult = await pool.query('SELECT * FROM lists WHERE id = $1', [id]);
-    if (listResult.rows.length === 0) {
-      return c.json({ error: 'List not found' }, 404);
-    }
-    const list = listResult.rows[0];
-
-    const statusesResult = await pool.query('SELECT * FROM task_statuses WHERE list_id = $1 ORDER BY position', [id]);
-
-    const tasksResult = await pool.query(`
-      SELECT 
-        t.*, ts.name as status_name, ts.color as status_color, u_assignee.name as assignee_name,
-        u_assignee.avatar_url as assignee_avatar, u_creator.name as creator_name,
-        COUNT(c.id)::int as comments_count, SUM(te.duration)::int as time_tracked
-      FROM tasks t
-      LEFT JOIN task_statuses ts ON t.status_id = ts.id
-      LEFT JOIN users u_assignee ON t.assignee_id = u_assignee.id
-      LEFT JOIN users u_creator ON t.creator_id = u_creator.id
-      LEFT JOIN comments c ON t.id = c.task_id
-      LEFT JOIN time_entries te ON t.id = te.task_id
-      WHERE t.list_id = $1 AND t.is_archived = false
-      GROUP BY t.id, ts.name, ts.color, u_assignee.name, u_assignee.avatar_url, u_creator.name
-      ORDER BY t.position, t.created_at
-    `, [id]);
-
-    return c.json({
-      list: { ...list, statuses: statusesResult.rows, tasks: tasksResult.rows, },
-    });
-  } catch (error) {
-    console.error(error);
-    return c.json({ error: 'Failed to fetch list' }, 500);
-  }
-});
-
-// Tasks API
-apiRoutes.get('/tasks/:id', async (c) => {
-  try {
-      const id = c.req.param('id');
-      const pool = c.get('PG');
-      const taskResult = await pool.query(`
-          SELECT 
-              t.*, ts.name as status_name, ts.color as status_color, u_assignee.name as assignee_name,
-              u_assignee.avatar_url as assignee_avatar, u_creator.name as creator_name, l.name as list_name,
-              COALESCE((SELECT json_agg(tags.*) FROM tags JOIN task_tags tt ON tags.id = tt.tag_id WHERE tt.task_id = t.id), '[]'::json) as tags,
-              COALESCE((SELECT json_agg(json_build_object('id', u.id, 'name', u.name, 'avatar_url', u.avatar_url)) FROM users u JOIN task_assignees ta ON u.id = ta.user_id WHERE ta.task_id = t.id), '[]'::json) as assignees,
-              COALESCE((SELECT json_agg(json_build_object('id', c.id, 'content', c.content, 'created_at', c.created_at, 'user_name', u.name, 'user_avatar', u.avatar_url)) FROM comments c JOIN users u ON c.user_id = u.id WHERE c.task_id = t.id), '[]'::json) as comments,
-              COALESCE((SELECT json_agg(json_build_object('id', st.id, 'name', st.name, 'status_id', st.status_id)) FROM tasks st WHERE st.parent_task_id = t.id), '[]'::json) as subtasks,
-              COALESCE((SELECT json_agg(json_build_object('id', a.id, 'action_type', a.action_type, 'details', a.details, 'created_at', a.created_at, 'user_name', u.name, 'user_avatar', u.avatar_url)) FROM activities a JOIN users u ON a.user_id = u.id WHERE a.entity_type = 'task' AND a.entity_id = t.id ORDER BY a.created_at DESC LIMIT 10), '[]'::json) as activities
-          FROM tasks t
-          LEFT JOIN task_statuses ts ON t.status_id = ts.id
-          LEFT JOIN users u_assignee ON t.assignee_id = u_assignee.id
-          LEFT JOIN users u_creator ON t.creator_id = u_creator.id
-          LEFT JOIN lists l ON t.list_id = l.id
-          WHERE t.id = $1
-          GROUP BY t.id, ts.id, u_assignee.id, u_creator.id, l.id
-      `, [id]);
-
-      if (taskResult.rows.length === 0) {
-          return c.json({ error: 'Task not found' }, 404);
-      }
-      return c.json({ task: taskResult.rows[0] });
-  } catch (error) {
-      console.error("Erro ao buscar detalhes da tarefa:", error);
-      return c.json({ error: 'Failed to fetch task details' }, 500);
-  }
-});
-
-apiRoutes.post('/tasks', requirePermission('task:create'), async (c) => {
-  try {
-      const body = await c.req.json();
-      const { list_id, name, description, priority = 'normal', assignee_id, creator_id, due_date } = body;
-      const pool = c.get('PG');
-      const insertResult = await pool.query(`
-          INSERT INTO tasks (list_id, name, description, priority, assignee_id, creator_id, due_date, created_at, updated_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-          RETURNING id
-      `, [list_id, name, description, priority, assignee_id, creator_id, due_date]);
-      const newTaskId = insertResult.rows[0].id;
-      const newTaskResult = await pool.query(`SELECT * FROM tasks WHERE id = $1`, [newTaskId]);
-      return c.json({ task: newTaskResult.rows[0] }, 201);
-  } catch (error) {
-      console.error(error);
-      return c.json({ error: 'Failed to create task' }, 500);
-  }
-});
-
-apiRoutes.put('/tasks/:id', async (c) => {
-  try {
-      const id = c.req.param('id');
-      const body = await c.req.json();
-      const { name, description, status_id, priority, assignee_id, due_date, progress } = body;
-      const pool = c.get('PG');
-
-      const oldTaskResult = await pool.query('SELECT * FROM tasks WHERE id = $1', [id]);
-      const oldTask = oldTaskResult.rows[0];
-
-      await pool.query(`
-          UPDATE tasks 
-          SET name = $1, description = $2, status_id = $3, priority = $4, assignee_id = $5, due_date = $6, progress = $7, updated_at = NOW()
-          WHERE id = $8
-      `, [name, description, status_id, priority, assignee_id, due_date, progress, id]);
-      
-      if (oldTask && oldTask.status_id !== status_id) {
-        const updatedTask = { ...oldTask, status_id: status_id };
-        processAutomations('status_changed', updatedTask, pool).catch(console.error);
-      }
-
-      const updatedTaskResult = await pool.query(`SELECT * FROM tasks WHERE id = $1`, [id]);
-      return c.json({ task: updatedTaskResult.rows[0] });
-  } catch (error) {
-      console.error(error);
-      return c.json({ error: 'Failed to update task' }, 500);
-  }
-});
-
-// Dashboard & Reports
-apiRoutes.get('/dashboard/stats', async (c) => { /* ... */ });
-apiRoutes.get('/dashboard/activity', async (c) => { /* ... */ });
-apiRoutes.get('/dashboard/my-tasks/:user_id', async (c) => { /* ... */ });
-apiRoutes.get('/reports/workspace/:id/team-performance', async (c) => { /* ... */ });
-apiRoutes.get('/reports/workspace/:id/priority-distribution', async (c) => { /* ... */ });
-apiRoutes.get('/reports/workspace/:id/completion-trend', async (c) => { /* ... */ });
-
-// AI
-apiRoutes.post('/ai/suggest-tasks', async (c) => {
-  try {
-    const { goal, list_id } = await c.req.json();
-    const apiKey = c.env.GEMINI_API_KEY;
-    if (!goal || !list_id || !apiKey) {
-      return c.json({ error: 'Dados insuficientes ou chave de API não configurada' }, 400);
-    }
-    const suggestions = await generateTaskSuggestions(goal, apiKey);
-    return c.json({ suggestions });
-  } catch(e) {
-    return c.json({ error: 'Falha ao gerar sugestões' }, 500);
-  }
-});
-
-// Automations
-apiRoutes.get('/lists/:id/automation-context', async (c) => { /* ... */ });
-apiRoutes.get('/lists/:id/automations', async (c) => { /* ... */ });
-apiRoutes.post('/automations', async (c) => { /* ... */ });
-
-// --- Public File Router ---
-export const publicRoutes = new Hono<Env>();
-
-publicRoutes.get('/avatars/:id', async (c) => {
-    const userId = c.req.param('id');
-    const fileKey = `avatars/user-${userId}`;
-    try {
-        const r2Object = await c.env.AVATAR_BUCKET.get(fileKey);
-        if (r2Object === null) return c.notFound();
-        const headers = new Headers();
-        r2Object.writeHttpMetadata(headers);
-        headers.set('etag', r2Object.httpEtag);
-        headers.set('Cache-Control', 'public, max-age=3600');
-        return new Response(r2Object.body, { headers });
-    } catch (error) {
-        console.error('Erro ao servir avatar do R2:', error);
-        return c.text('Erro ao buscar imagem', 500);
-    }
-});
+export default app;

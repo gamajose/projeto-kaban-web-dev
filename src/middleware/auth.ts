@@ -2,6 +2,7 @@
 
 import { createMiddleware } from 'hono/factory';
 import type { Pool } from 'pg';
+import { verify } from 'hono/jwt';
 import type { CloudflareBindings } from '../types';
 
 type Permission = 'task:create' | 'task:edit:any' | 'workspace:edit';
@@ -14,14 +15,35 @@ const permissionMap = {
   guest: ['task:create'],
 };
 
+export const jwtMiddleware = createMiddleware<{ Bindings: CloudflareBindings }>(async (c, next) => {
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return c.json({ error: 'Token em falta ou mal formatado' }, 401);
+    }
+    
+    const token = authHeader.split(' ')[1];
+    const secret = c.env.JWT_SECRET;
+
+    try {
+        const decodedPayload = await verify(token, secret);
+        c.set('jwtPayload', decodedPayload); // Guarda o payload do token para uso posterior
+        await next();
+    } catch (error) {
+        return c.json({ error: 'Token inválido' }, 401);
+    }
+});
+
+
 export const requirePermission = (permission: Permission) => {
   return createMiddleware<{ Bindings: CloudflareBindings }>(async (c, next) => {
-    // Em um sistema real, o ID do usuário viria de um token de sessão/JWT
-    // Por agora, vamos simular que o usuário é o 'Admin User' (ID 1)
-    const currentUserId = 1;
+    const payload = c.get('jwtPayload');
+    if (!payload || !payload.sub) {
+        return c.json({ error: 'Payload do token inválido' }, 401);
+    }
+
+
+    const currentUserId = payload.sub as number;
     
-    // Precisamos saber em qual workspace a ação está a ocorrer
-    // Vamos extrair o workspaceId a partir dos parâmetros da rota ou do corpo do pedido
     let workspaceId: number | undefined;
     if (c.req.param('workspace_id')) {
       workspaceId = parseInt(c.req.param('workspace_id'));

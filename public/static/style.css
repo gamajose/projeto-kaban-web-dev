@@ -32,12 +32,21 @@
     overflow: hidden;
 }
 
-.app-sidebar {
-    grid-area: sidebar;
-    background: #2C3E50;
-    color: white;
-    overflow-y: auto;
+.app-body {
+    display: flex;
+    flex-grow: 1; /* Ocupa o resto da altura */
+    overflow: hidden;
 }
+
+.app-sidebar {
+    width: 260px;
+    background-color: var(--bg-secondary);
+    border-right: 1px solid var(--border-color);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+}
+
 
 .app-header {
     grid-area: header;
@@ -472,6 +481,25 @@
     margin: 16px 0;
 }
 
+.app-container {
+    display: flex;
+    flex-direction: column; /* Organiza header e corpo verticalmente */
+    height: 100vh;
+    overflow: hidden;
+}
+
+.app-header-fullwidth {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    height: 50px;
+    background-color: var(--bg-header);
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0; /* Impede que o header encolha */
+}
+
+
 /* Drag and drop */
 .dragging {
     opacity: 0.5;
@@ -501,4 +529,306 @@
 @keyframes slideUp {
     from { transform: translateY(20px); opacity: 0; }
     to { transform: translateY(0); opacity: 1; }
+}
+
+
+.home-layout {
+    display: grid;
+    height: 100vh;
+    overflow: hidden;
+    grid-template-columns: 260px 1fr; /* Sidebar e Conteúdo */
+    grid-template-rows: 60px 1fr; /* Header e Área Principal */
+    grid-template-areas: 
+        "sidebar header"
+        "sidebar main-content";
+}
+
+.home-sidebar {
+    grid-area: sidebar;
+    background-color: var(--sidebar-bg);
+    color: var(--sidebar-text);
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--sidebar-border);
+}
+
+.home-header {
+    grid-area: header;
+    background-color: #ffffff;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+}
+
+.main-content-area {
+    grid-area: main-content;
+    background-color: #f8f9fa;
+    overflow-y: auto;
+    padding: 24px;
+}
+
+/* Estilos específicos da Sidebar */
+.sidebar-header, .sidebar-footer {
+    padding: 16px;
+}
+
+.sidebar-nav {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+}
+
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    padding: 8px 16px;
+    margin: 2px 8px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.sidebar-link:hover {
+    background-color: var(--sidebar-active-bg);
+    color: var(--sidebar-text-hover);
+}
+
+.sidebar-link i {
+    width: 20px;
+    margin-right: 12px;
+    text-align: center;
+}
+
+.sidebar-section-header {
+    padding: 12px 16px 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #6c6f78;
+    text-transform: uppercase;
+}
+
+/* Estilos do Header */
+.header-search {
+    width: 400px;
+}
+
+/* Estilos dos Widgets de Conteúdo */
+.content-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr; /* Coluna principal e agenda */
+    gap: 24px;
+}
+
+.widget-card {
+    background: var(--bg-secondary); /* Usa o fundo escuro secundário */
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    padding: 24px;
+    display: flex; /* Adicionado para controlo interno */
+    flex-direction: column; /* Adicionado para controlo interno */
+}
+
+.widget-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 16px;
+}
+
+:root {
+    --bg-primary: #141517;
+    --bg-secondary: #1e1f21;
+    --bg-header: #26282b;
+    --border-color: #3a3b3d;
+    --text-primary: #ffffff;
+    --text-secondary: #a6a7ab;
+    --accent-color: #8c52ff;
+}
+
+.home-sidebar {
+    width: 260px;
+    background-color: var(--sidebar-bg);
+    color: var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--sidebar-border);
+    flex-shrink: 0;
+}
+
+.main-view {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.pro-layout {
+    display: grid;
+    height: 100vh;
+    overflow: hidden;
+    grid-template-columns: 260px 1fr; /* Sidebar | Conteúdo */
+    grid-template-rows: 45px 50px 1fr; /* TopBar | SubHeader | Conteúdo Principal */
+    grid-template-areas: 
+        "sidebar top-bar"
+        "sidebar sub-header"
+        "sidebar main-content";
+}
+
+.pro-sidebar {
+    grid-area: sidebar;
+    background-color: var(--bg-secondary);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+}
+
+.pro-topbar {
+    grid-area: top-bar;
+    background-color: var(--bg-header);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+}
+
+.pro-subheader {
+    grid-area: sub-header;
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+}
+
+.pro-main-content {
+    grid-area: main-content;
+    overflow-y: auto;
+    padding: 24px;
+}
+
+/* Componentes internos */
+.pro-search-bar {
+    max-width: 500px;
+    width: 100%;
+}
+.pro-search-bar input {
+    background-color: #3a3b3d;
+    border-color: #505257;
+}
+
+.pro-sidebar .sidebar-link.active {
+    background-color: #3a3b3d;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.header-search-long {
+    /* O flex-1 no HTML fará com que ocupe o espaço */
+}
+
+.header-container {
+    flex-shrink: 0;
+}
+
+.top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* Isto organiza os itens */
+    padding: 8px 16px; /* Um pouco menos de padding lateral */
+    background-color: var(--header-bg);
+    border-bottom: 1px solid var(--sidebar-border);
+}
+
+.top-bar-logo {
+    flex-shrink: 0; /* Impede que o logo encolha */
+}
+
+.main-content-area {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 24px;
+}
+
+.widget-card {
+    background: var(--header-bg); /* Usar o mesmo fundo escuro para widgets */
+    border-radius: 8px;
+    border: 1px solid var(--sidebar-border);
+    padding: 24px;
+}
+
+.sub-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 24px;
+    background-color: var(--header-bg);
+    border-bottom: 1px solid var(--sidebar-border);
+}
+
+.main-content-area {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 24px;
+}
+
+.header-search {
+    max-width: 600px; /* Define um tamanho máximo */
+    width: 100%; /* Ocupa o espaço disponível até ao máximo */
+    margin: 0 24px; /* Adiciona margem dos lados */
+}
+
+
+.app-main-view {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.app-subheader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    height: 50px;
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.app-content-area {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 24px;
+    background-color: var(--bg-primary);
+}
+
+/* Componentes internos */
+.header-search-centered {
+    flex-grow: 1;
+    display: flex;
+    justify-content: center; /* Centraliza a barra de pesquisa */
+}
+.header-search-centered .relative {
+    width: 100%;
+    max-width: 600px;
+}
+.header-search-centered input {
+    background-color: #3a3b3d;
+    border-color: #505257;
+}
+
+.app-sidebar .sidebar-link.active {
+    background-color: #3a3b3d;
+    color: var(--text-primary);
+    font-weight: 600;
 }

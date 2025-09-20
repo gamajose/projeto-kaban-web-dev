@@ -1,14 +1,6 @@
 -- Seed data for ClickUp Clone (PostgreSQL Compatible)
 
 -- Insert test users
-INSERT INTO users (id, email, password_hash, name, avatar_url, role) VALUES 
-  (1, 'admin@clickupclone.com', '$2a$10$mock.hash.for.admin', 'Admin User', '/static/avatars/admin.png', 'admin'),
-  (2, 'alice@company.com', '$2a$10$mock.hash.for.alice', 'Alice Johnson', '/static/avatars/alice.png', 'member'),
-  (3, 'bob@company.com', '$2a$10$mock.hash.for.bob', 'Bob Smith', '/static/avatars/bob.png', 'member'),
-  (4, 'charlie@company.com', '$2a$10$mock.hash.for.charlie', 'Charlie Brown', '/static/avatars/charlie.png', 'member'),
-  (5, 'diana@company.com', '$2a$10$mock.hash.for.diana', 'Diana Prince', '/static/avatars/diana.png', 'member')
-ON CONFLICT (id) DO NOTHING;
-
 -- Insert test workspace
 INSERT INTO workspaces (id, name, slug, description, color, owner_id) VALUES 
   (1, 'Acme Corporation', 'acme-corp', 'Main workspace for Acme Corporation projects', '#6B73FF', 1)
@@ -138,3 +130,5 @@ ON CONFLICT DO NOTHING;
 INSERT INTO automations (list_id, name, trigger_type, trigger_config, action_type, action_config) VALUES
 (3, 'Atribuir tarefas de teste para a Diana', 'status_changed', '{"to_status_id": 12}', 'assign_user', '{"assignee_id": 5}')
 ON CONFLICT DO NOTHING;
+
+SELECT setval(pg_get_serial_sequence('users', 'id'), (SELECT MAX(id) FROM users));

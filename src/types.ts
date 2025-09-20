@@ -12,7 +12,6 @@ export interface CloudflareBindings {
   DB_DATABASE: string;
 
   GEMINI_API_KEY: string;
-  JWT_SECRET: string;
 }
 
 export interface User {
