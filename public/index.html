@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full bg-gray-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClickUp Clone - Gerenciamento de Projetos</title>
+    
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        clickup: {
+                            purple: '#7b68ee',
+                            blue: '#0078d4',
+                            green: '#00d084',
+                            orange: '#ff6b35',
+                            red: '#ff4757',
+                            yellow: '#feca57',
+                            gray: '#7c7c7c',
+                            dark: '#1a1a1a',
+                            sidebar: '#2c2d30',
+                            hover: '#3a3b3f'
+                        }
+                    },
+                    fontFamily: {
+                        'sans': ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- FullCalendar -->
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+    
+    <!-- Sortable.js para drag & drop -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    
+    <!-- Day.js para manipulação de datas -->
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/plugin/relativeTime.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/plugin/calendar.js"></script>
+    
+    <!-- Custom styles -->
+    <style>
+        .sidebar-transition { transition: width 0.3s ease; }
+        .task-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .clickup-gradient { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .scrollbar-thin { scrollbar-width: thin; }
+        .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: #f1f1f1; }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
+        .kanban-column { min-height: 500px; }
+        .priority-urgent { border-left: 3px solid #ff4757; }
+        .priority-high { border-left: 3px solid #ff6b35; }
+        .priority-normal { border-left: 3px solid #0078d4; }
+        .priority-low { border-left: 3px solid #7c7c7c; }
+    </style>
+</head>
+<body class="h-full overflow-hidden bg-gray-50">
+    <!-- Loading screen -->
+    <div id="loading-screen" class="fixed inset-0 bg-white z-50 flex items-center justify-center">
+        <div class="text-center">
+            <div class="w-12 h-12 border-4 border-clickup-purple border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p class="text-gray-600">Carregando ClickUp Clone...</p>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="app" class="hidden h-full flex">
+        <!-- Sidebar -->
+        <div id="sidebar" class="sidebar-transition w-64 bg-clickup-sidebar text-white flex-shrink-0 overflow-hidden">
+            <div class="h-full flex flex-col">
+                <!-- Logo and User -->
+                <div class="p-4 border-b border-clickup-hover">
+                    <div class="flex items-center space-x-3 mb-3">
+                        <div class="w-8 h-8 bg-clickup-purple rounded-lg flex items-center justify-center">
+                            <i class="fas fa-rocket text-white text-sm"></i>
+                        </div>
+                        <h1 class="font-semibold text-lg">ClickUp Clone</h1>
+                    </div>
+                    
+                    <!-- User Profile -->
+                    <div id="user-profile" class="flex items-center space-x-3 p-2 rounded-lg hover:bg-clickup-hover cursor-pointer">
+                        <div class="w-8 h-8 bg-clickup-blue rounded-full flex items-center justify-center">
+                            <span class="text-xs font-medium">JD</span>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-sm font-medium truncate">José Developer</div>
+                            <div class="text-xs text-gray-300 truncate">Workspace: Acme Corp</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navigation -->
+                <div class="flex-1 overflow-y-auto scrollbar-thin">
+                    <nav class="p-2">
+                        <!-- Main Navigation -->
+                        <div class="mb-4">
+                            <div class="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Início</div>
+                            <div class="nav-item active" data-page="home">
+                                <i class="fas fa-home"></i>
+                                <span>Início</span>
+                            </div>
+                            <div class="nav-item" data-page="dashboard">
+                                <i class="fas fa-chart-pie"></i>
+                                <span>Dashboard</span>
+                            </div>
+                            <div class="nav-item" data-page="chat">
+                                <i class="fas fa-comments"></i>
+                                <span>Chat</span>
+                            </div>
+                        </div>
+
+                        <!-- Favorites -->
+                        <div class="mb-4">
+                            <div class="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Favoritos</div>
+                            <div class="nav-item">
+                                <i class="fas fa-star text-yellow-400"></i>
+                                <span>Minhas Tarefas</span>
+                            </div>
+                        </div>
+
+                        <!-- Workspaces -->
+                        <div id="workspaces-nav" class="mb-4">
+                            <div class="flex items-center justify-between px-3 py-1">
+                                <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Workspaces</div>
+                                <button class="text-gray-400 hover:text-white">
+                                    <i class="fas fa-plus text-xs"></i>
+                                </button>
+                            </div>
+                            <!-- Workspaces will be populated by JS -->
+                        </div>
+
+                        <!-- Current Workspace Details -->
+                        <div id="current-workspace" class="mb-4">
+                            <!-- Will be populated by JS -->
+                        </div>
+                    </nav>
+                </div>
+
+                <!-- Sidebar Footer -->
+                <div class="p-4 border-t border-clickup-hover">
+                    <div class="flex items-center justify-between">
+                        <button id="sidebar-toggle" class="text-gray-400 hover:text-white">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <button class="text-gray-400 hover:text-white">
+                            <i class="fas fa-cog"></i>
+                        </button>
+                        <button class="text-gray-400 hover:text-white">
+                            <i class="fas fa-question-circle"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Top Header -->
+            <header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <!-- Breadcrumb -->
+                    <nav id="breadcrumb" class="flex items-center space-x-2 text-sm">
+                        <!-- Will be populated by JS -->
+                    </nav>
+                </div>
+
+                <div class="flex items-center space-x-4">
+                    <!-- Search -->
+                    <div class="relative">
+                        <input type="text" placeholder="Pesquisar..." class="w-80 px-4 py-2 pl-10 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-clickup-purple focus:border-transparent">
+                        <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        <span class="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-400">⌘K</span>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <button id="new-task-btn" class="bg-clickup-purple text-white px-4 py-2 rounded-lg hover:bg-opacity-90 transition-colors">
+                        <i class="fas fa-plus mr-2"></i>
+                        Nova Tarefa
+                    </button>
+
+                    <!-- User Actions -->
+                    <div class="flex items-center space-x-3">
+                        <button class="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100">
+                            <i class="fas fa-bell"></i>
+                            <span class="sr-only">Notificações</span>
+                        </button>
+                        
+                        <button class="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100">
+                            <i class="fas fa-user-circle text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Content Area -->
+            <main class="flex-1 overflow-hidden">
+                <!-- Page Container -->
+                <div id="page-container" class="h-full">
+                    <!-- Home Page -->
+                    <div id="home-page" class="page-content active h-full overflow-y-auto">
+                        <!-- Will be populated by home.js -->
+                    </div>
+
+                    <!-- Dashboard Page -->
+                    <div id="dashboard-page" class="page-content h-full overflow-y-auto">
+                        <!-- Will be populated by dashboard.js -->
+                    </div>
+
+                    <!-- Workspace Page -->
+                    <div id="workspace-page" class="page-content h-full overflow-y-auto">
+                        <!-- Will be populated by workspace.js -->
+                    </div>
+
+                    <!-- List View Page -->
+                    <div id="list-page" class="page-content h-full overflow-y-auto">
+                        <!-- Will be populated by list-view.js -->
+                    </div>
+
+                    <!-- Board View Page -->
+                    <div id="board-page" class="page-content h-full overflow-y-auto">
+                        <!-- Will be populated by board-view.js -->
+                    </div>
+
+                    <!-- Calendar View Page -->
+                    <div id="calendar-page" class="page-content h-full overflow-y-auto">
+                        <!-- Will be populated by calendar-view.js -->
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-overlay" class="modal-overlay">
+        <!-- Task Modal -->
+        <div id="task-modal" class="modal">
+            <!-- Will be populated by task-modal.js -->
+        </div>
+
+        <!-- New Task Modal -->
+        <div id="new-task-modal" class="modal">
+            <!-- Will be populated by new-task-modal.js -->
+        </div>
+    </div>
+
+    <!-- Notification Container -->
+    <div id="notifications" class="fixed top-4 right-4 z-50 space-y-2">
+        <!-- Notifications will be added here -->
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/auth.js"></script>
+    <script src="/static/js/pages/home.js"></script>
+    <script src="/static/js/pages/dashboard.js"></script>
+    <script src="/static/js/pages/workspace.js"></script>
+    <script src="/static/js/pages/list-view.js"></script>
+    <script src="/static/js/pages/board-view.js"></script>
+    <script src="/static/js/pages/calendar-view.js"></script>
+    <script src="/static/js/components/task-modal.js"></script>
+    <script src="/static/js/components/sidebar.js"></script>
+    <script src="/static/js/components/notifications.js"></script>
+
+    <style>
+        .nav-item {
+            @apply flex items-center space-x-3 px-3 py-2 rounded-lg cursor-pointer text-gray-300 hover:bg-clickup-hover hover:text-white transition-colors;
+        }
+        .nav-item.active {
+            @apply bg-clickup-hover text-white;
+        }
+        .nav-item i {
+            @apply w-4 h-4 flex items-center justify-center text-sm;
+        }
+
+        .page-content {
+            @apply hidden;
+        }
+        .page-content.active {
+            @apply block;
+        }
+
+        .modal-overlay {
+            @apply fixed inset-0 bg-black bg-opacity-50 z-40 hidden items-center justify-center;
+        }
+        .modal-overlay.active {
+            @apply flex;
+        }
+
+        .modal {
+            @apply bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto m-4;
+        }
+
+        .workspace-item {
+            @apply flex items-center space-x-2 px-3 py-2 rounded-lg cursor-pointer text-gray-300 hover:bg-clickup-hover hover:text-white transition-colors;
+        }
+
+        .space-item {
+            @apply flex items-center space-x-2 px-3 py-1.5 rounded cursor-pointer text-gray-400 hover:bg-clickup-hover hover:text-white transition-colors text-sm;
+        }
+
+        .list-item {
+            @apply flex items-center space-x-2 px-4 py-1 rounded cursor-pointer text-gray-400 hover:bg-clickup-hover hover:text-white transition-colors text-sm;
+        }
+    </style>
+</body>
+</html>
